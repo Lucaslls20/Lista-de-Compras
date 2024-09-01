@@ -7,6 +7,7 @@ import Login from './Login/Login';
 import Register from './Login/Registro';
 import Home from './Telas/Home';
 import { PaperProvider } from 'react-native-paper';
+import Shopping from './Telas/Shopping';
 
 const App = () => {
 
@@ -30,22 +31,13 @@ const App = () => {
                     <Stack.Screen name='Login' component={Login} options={{ headerShown: false }} />
                     <Stack.Screen name='Registro' component={Register} options={{ headerShown: false }} />
                     <Stack.Screen name='Home' component={Home} options={{ headerShown: false }} />
-                {/*   <Stack.Screen name='Detalhes' component={Detalhes} /> */}
+                    <Stack.Screen name='Shopping' component={Shopping} options={{headerShown:false}} />
                 </Stack.Navigator>
             </NavigationContainer>
         </PaperProvider>
     );
 
 }
-{/*const Detalhes = ({ route }) => {
-    const { itemId } = route.params;
 
-    return (
-        <View>
-            <Text>Detalhes do item {itemId}</Text>
-        </View>
-    );
-};
-*/}
 
 export default App;
