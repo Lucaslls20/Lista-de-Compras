@@ -27,7 +27,7 @@ const App = () => {
                         },
                     }}
                 >
-                    <Stack.Screen name='Tela Inicial' component={Inicial} />
+                    <Stack.Screen name='Tela Inicial' component={Inicial} options={{headerShown:false}} />
                     <Stack.Screen name='Login' component={Login} options={{ headerShown: false }} />
                     <Stack.Screen name='Registro' component={Register} options={{ headerShown: false }} />
                     <Stack.Screen name='Home' component={Home} options={{ headerShown: false }} />

@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
   descriptionText: {
     fontSize: 15,
     textAlign: 'center',
-    color: '#E6552E',
+    color: '#138535',
   },
   mainImageContainer: {
     width: '95%',
