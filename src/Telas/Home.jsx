@@ -1,30 +1,35 @@
-// Home.js
 import React, { useState, useEffect } from 'react';
-import { View, FlatList, StyleSheet, Dimensions } from 'react-native';
-import { List, Appbar, FAB, Button, Dialog, Portal, Text, PaperProvider,TextInput } from 'react-native-paper';
+import { View, FlatList, StyleSheet, Dimensions, Alert } from 'react-native';
+import { List, Appbar, FAB, Button, Dialog, Portal, Text, PaperProvider, TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
-import { collection, addDoc, deleteDoc, doc, onSnapshot, getDocs } from "firebase/firestore";
-import { db } from '../../services/firebaseConfig';
+import { collection, addDoc, deleteDoc, doc, onSnapshot, getDocs, query, where } from "firebase/firestore"; // Import 'query' and 'where'
+import { db, auth } from '../../services/firebaseConfig'; // Import 'auth' 
 import { writeBatch } from "firebase/firestore";
+
 
 const { width, height } = Dimensions.get('window');
 
 const Home = () => {
   const navigation = useNavigation();
-  const [data, setData] = useState([]); // Lista de lojas
+  const [data, setData] = useState([]);
   const [visible, setVisible] = useState(false);
   const [newItemTitle, setNewItemTitle] = useState('');
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'stores'), (snapshot) => {
-      const fetchedItems = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setData(fetchedItems);
-    });
+    const user = auth.currentUser;
+    if (user) {
+      const storesRef = collection(db, 'stores');
+      const q = query(storesRef, where('userId', '==', user.uid)); // Filtra as lojas pelo UID do usuário
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const fetchedItems = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setData(fetchedItems);
+      });
 
-    return () => unsubscribe();
+      return () => unsubscribe();
+    }
   }, []);
 
   const showDialog = () => setVisible(true);
@@ -33,12 +38,16 @@ const Home = () => {
   const addItem = async () => {
     if (newItemTitle.trim()) {
       try {
-        await addDoc(collection(db, 'stores'), { // Alteração para 'stores'
-          title: newItemTitle,
-          completed: false,
-        });
-        setNewItemTitle('');
-        hideDialog();
+        const user = auth.currentUser;
+        if (user) {
+          await addDoc(collection(db, 'stores'), {
+            title: newItemTitle,
+            completed: false,
+            userId: user.uid, // Salva o UID do usuário junto com os dados da loja
+          });
+          setNewItemTitle('');
+          hideDialog();
+        }
       } catch (error) {
         console.error('Erro ao adicionar loja:', error);
         Alert.alert('Erro', 'Não foi possível adicionar a loja. Tente novamente.');
@@ -46,67 +55,60 @@ const Home = () => {
     }
   };
 
-  const deleteItem = async (id) => {
+  const deleteStoreAndItems = async (id) => {
     try {
-      const itemRef = doc(db, 'stores', id); // Alteração para 'stores'
-      await deleteDoc(itemRef);
-    } catch (error) {
-      console.error('Erro ao deletar loja:', error);
-      Alert.alert('Erro', 'Não foi possível deletar a loja. Tente novamente.');
-    }
-  };
-
-  const deleteAll = async () => {
-    try {
-      const querySnapshot = await getDocs(collection(db, 'stores')); // Alteração para 'stores'
+      const storeRef = doc(db, 'stores', id);
+      const itemsQuery = await getDocs(collection(db, 'shoppingItems'));
       const batch = writeBatch(db);
-      querySnapshot.forEach((doc) => {
-        batch.delete(doc.ref);
+
+      itemsQuery.forEach((doc) => {
+        if (doc.data().storeId === id) {
+          batch.delete(doc.ref);
+        }
       });
+
+      batch.delete(storeRef);
       await batch.commit();
+
     } catch (error) {
-      console.error('Erro ao excluir todas as lojas:', error);
-      Alert.alert('Erro', 'Não foi possível excluir todas as lojas. Tente novamente.');
+      console.error('Erro ao deletar loja e itens associados:', error);
+      Alert.alert('Erro', 'Não foi possível deletar a loja e os itens. Tente novamente.');
     }
   };
-
-  const renderItem = ({ item }) => (
-    <List.Item
-      titleStyle={styles.title}
-      title={item.title}
-      left={() => <Text style={styles.icon}>🛒</Text>}
-      right={() => (
-        <Text 
-          onPress={() => deleteItem(item.id)} 
-          style={styles.delete}
-          accessible={true}
-          accessibilityLabel={`Deletar loja ${item.title}`}
-        >
-          🗑️
-        </Text>
-      )}
-      onPress={() => navigation.navigate('Shopping', { store: item })} // Alteração no nome do parâmetro
-      style={styles.listItem}
-    />
-  );
 
   return (
     <PaperProvider>
-      <View style={{flex:1, backgroundColor:'#150BA2'}}>
-        <Appbar.Header style={{ backgroundColor: '#150BA2', marginTop: 10 }}>
-          <Appbar.Content title="Lista de Compras" titleStyle={{color:'#FFF'}}/>
+      <View style={styles.container}>
+        <Appbar.Header style={styles.appbar}>
+          <Appbar.Content title="Minhas Lojas" titleStyle={styles.appbarTitle} />
         </Appbar.Header>
 
         <FlatList
           data={data}
-          renderItem={renderItem}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.flatList}
-          ListEmptyComponent={
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <List.Item
+              title={item.title}
+              style={styles.listItem}
+              titleStyle={styles.titleStyle}
+              onPress={() => navigation.navigate('Shopping', { store: item })}
+              right={() => (
+                <Text 
+                  style={styles.delete} 
+                  onPress={() => deleteStoreAndItems(item.id)}
+                  accessible={true}
+                  accessibilityLabel={`Deletar loja ${item.title}`}
+                >
+                  🗑️
+                </Text>
+              )}
+            />
+          )}
+          ListEmptyComponent={() => (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>Nenhuma loja adicionada ainda.</Text>
+              <Text style={styles.emptyMessage}>Nenhuma loja cadastrada. Adicione uma nova loja!</Text>
             </View>
-          }
+          )}
         />
 
         <FAB
@@ -122,113 +124,99 @@ const Home = () => {
             <Dialog.Title>Adicionar Nova Loja</Dialog.Title>
             <Dialog.Content>
               <TextInput
-                placeholder='Nome da loja'
-                placeholderTextColor='#FFF'
+                label="Nome da Loja"
                 value={newItemTitle}
                 onChangeText={setNewItemTitle}
-                mode='outlined'
                 style={styles.input}
-                accessibilityLabel="Campo para digitar o nome da loja"
+                accessibilityLabel="Campo para adicionar o nome de uma nova loja"
               />
             </Dialog.Content>
             <Dialog.Actions>
-              <Button onPress={addItem}>Adicionar</Button>
-              <Button onPress={hideDialog}>Cancelar</Button>
+              <Button onPress={hideDialog} accessibilityLabel="Cancelar adição de nova loja">Cancelar</Button>
+              <Button onPress={addItem} accessibilityLabel="Confirmar adição de nova loja">Adicionar</Button>
             </Dialog.Actions>
           </Dialog>
         </Portal>
-
-        <View style={styles.deleteAllContainer}>
-          <Button onPress={deleteAll}>
-            <Text style={styles.deleteAllText}>Excluir tudo</Text>
-          </Button>
-        </View>
       </View>
     </PaperProvider>
   );
 };
 
 const styles = StyleSheet.create({
-  flatList: {
-    padding: 10,
-    flexGrow: 1,
+  container: {
+    flex: 1,
+    padding: 16,
+    backgroundColor: '#F5F5F5',
+  },
+  appbar: {
+    backgroundColor: '#3E4A59',
+    borderWidth: 4,
+    borderRadius: 10,
+    paddingLeft: 20,
+  },
+  appbarTitle: {
+    color: '#FFF',
+    fontStyle: 'italic',
+    fontWeight: 'bold',
+    fontSize: 25,
+    textShadowColor: 'rgba(0, 0, 0, 0.55)',
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 10,
   },
   listItem: {
-    backgroundColor: '#202453',
-    marginVertical: height * 0.015,
-    borderWidth: 4,
-    paddingLeft: 10,
-    borderRadius: 10,
-    height: height * 0.1, // Altura proporcional à tela
+    width: '100%',
+    backgroundColor: '#F5F5DC',
+    marginVertical: 4,
+    marginTop: 20,
+    borderRadius: 20,
   },
-  title: {
-    fontSize: height * 0.037, // Tamanho proporcional à largura da tela
+  titleStyle: {
+    fontSize: 22,
+    color: '#37474F',
     fontWeight: 'bold',
-    color: '#FFF',
-    fontStyle: 'italic'
+    textShadowColor: 'rgba(0, 0, 0, 0.45)',
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 10,
   },
-  icon: {
-    fontSize: width * 0.06, // Tamanho proporcional à largura da tela
-    paddingLeft: 10,
-    alignItems: 'center',
+  emptyContainer: {
+    flex: 1,
     justifyContent: 'center',
-    textAlignVertical: 'center',
+    alignItems: 'center',
+    marginTop: 50,
   },
-  delete: {
-    fontSize: width * 0.045, // Tamanho proporcional à largura da tela
-    textAlign: 'center',
-    paddingRight: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    textAlignVertical: 'center',
+  emptyMessage: {
+    fontSize: 18,
+    color: '#A41F1B',
+  },
+  input: {
+    marginBottom: 10,
+    backgroundColor: '#555',
   },
   fab: {
     position: 'absolute',
     margin: 16,
     right: 0,
     bottom: 0,
-    backgroundColor: '#03dac6',
+    backgroundColor: '#03A9F4',
     width: width * 0.15,
     height: width * 0.15,
     borderRadius: width * 0.075,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 5,
+    elevation: 4,
   },
   fabIcon: {
-    fontSize: width * 0.08, // Tamanho proporcional à largura da tela
+    fontSize: width * 0.08,
     color: '#FFF',
     textAlign: 'center',
     lineHeight: width * 0.09,
   },
-  input: {
-    marginBottom: 15,
-    color: '#FFF',
-  },
-  deleteAllContainer: {
-    width: '70%',
-    borderWidth: 3,
-    marginBottom: 20,
-    marginLeft: 18,
-    borderRadius: 20,
-    backgroundColor: '#D32F2F',
-    marginRight: 10
-  },
-  deleteAllText: {
-    fontSize: width * 0.045,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: width * 0.05,
-    color: '#FFF',
-    fontStyle: 'italic',
+  delete: {
+    padding: 8,
+    color: 'red',
+    fontSize: 18,
   },
 });
 
 export default Home;
+

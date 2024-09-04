@@ -5,8 +5,9 @@ import { Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { auth } from '../../services/firebaseConfig';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
+import PrivacyLink from '../Telas/PrivacyLink';
 
-const Login = () => {
+const Register = () => {
   
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -16,7 +17,7 @@ const Login = () => {
     const handleRegister = async() => {
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password); // Correção aqui
-            Alert.alert('Cadastro bem-sucedido!', `Bem-vindo, ${userCredential.user.email}`);
+           // Alert.alert('Cadastro bem-sucedido!', `Bem-vindo, ${userCredential.user.email}`);
             navigation.navigate('Home');  // Ajuste conforme necessário
         } catch (error) {
             Alert.alert('Erro ao cadastrar', error.message);
@@ -67,12 +68,18 @@ const Login = () => {
                 >
                     Cadastro
                 </Button>
-
+                
            
+
 
                 <Pressable style={{ marginTop: 50, alignItems: 'center', justifyContent: 'center' }} onPress={() => navigation.navigate('Tela Inicial')}>
                     <Text style={{ color: '#E04B00' }}>Voltar para tela inicial</Text>
                 </Pressable>
+
+                <View style={{alignItems:'center', marginTop:40}}>
+               <PrivacyLink/>
+               </View>
+
             </View>
         </View>
     );
@@ -107,4 +114,4 @@ const styles = StyleSheet.create({
   
 });
 
-export default Login;
+export default Register;

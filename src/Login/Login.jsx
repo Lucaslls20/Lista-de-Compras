@@ -5,6 +5,7 @@ import { Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { auth } from '../../services/firebaseConfig';
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import PrivacyLink from '../Telas/PrivacyLink';
 
 const Login = () => {
 
@@ -16,7 +17,7 @@ const Login = () => {
     const handleLogin = async () => {
         try {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            Alert.alert('Login bem-sucedido!', `Bem-vindo, ${userCredential.user.email}`);
+           // Alert.alert('Login bem-sucedido!', `Bem-vindo, ${userCredential.user.email}`);
             navigation.navigate('Home');  // Ajuste conforme necessário
         } catch (error) {
             Alert.alert('Erro ao fazer login', error.message);
@@ -73,6 +74,12 @@ const Login = () => {
                 <Pressable style={{ marginTop: 50, alignItems: 'center', justifyContent: 'center' }} onPress={() => navigation.navigate('Tela Inicial')}>
                     <Text style={{ color: '#E04B00' }}>Voltar para tela inicial</Text>
                 </Pressable>
+ 
+                <View style={{alignItems:'center', marginTop:40}}>
+               <PrivacyLink/>
+               </View>
+
+
             </View>
         </View>
     );

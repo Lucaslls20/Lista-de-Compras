@@ -8,6 +8,7 @@ import Register from './Login/Registro';
 import Home from './Telas/Home';
 import { PaperProvider } from 'react-native-paper';
 import Shopping from './Telas/Shopping';
+import PrivacyPolitic from './Telas/PoliticPrivacy';
 
 const App = () => {
 
@@ -32,6 +33,7 @@ const App = () => {
                     <Stack.Screen name='Registro' component={Register} options={{ headerShown: false }} />
                     <Stack.Screen name='Home' component={Home} options={{ headerShown: false }} />
                     <Stack.Screen name='Shopping' component={Shopping} options={{headerShown:false}} />
+                    <Stack.Screen name='Politica de Privacidade' component={PrivacyPolitic} options={{headerShown:false}} />
                 </Stack.Navigator>
             </NavigationContainer>
         </PaperProvider>
