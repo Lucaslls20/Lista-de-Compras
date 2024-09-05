@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, FlatList, StyleSheet, Text, Dimensions, TouchableOpacity, Alert } from 'react-native';
+import { View, FlatList, StyleSheet, Text, Dimensions, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Checkbox, TextInput, FAB, Appbar, List, PaperProvider } from 'react-native-paper';
 import { collection, addDoc, updateDoc, doc, deleteDoc, onSnapshot, query, where, getDoc } from "firebase/firestore";
 import { db, auth } from '../../services/firebaseConfig';
@@ -10,9 +10,10 @@ export default function Shopping({ route, navigation }) {
   const { store } = route.params;
   const [items, setItems] = useState([]);
   const [newItem, setNewItem] = useState('');
+  const [loading, setLoading] = useState(true);
 
   const EmojiCheckbox = ({ completed, onPress }) => (
-    <TouchableOpacity style={{marginLeft:10}} onPress={onPress} accessible={true} accessibilityLabel={completed ? "Desmarcar item" : "Marcar item como concluído"}>
+    <TouchableOpacity style={{ marginLeft: 10 }} onPress={onPress} accessible={true} accessibilityLabel={completed ? "Desmarcar item" : "Marcar item como concluído"}>
       <Text style={{ fontSize: 24 }}>
         {completed ? '✅' : '⬜'}
       </Text>
@@ -33,9 +34,12 @@ export default function Shopping({ route, navigation }) {
           ...doc.data()
         }));
         setItems(fetchedItems);
+        setLoading(false);
       });
 
       return () => unsubscribe();
+    } else {
+      setLoading(false);
     }
   }, [store.id]);
 
@@ -92,38 +96,44 @@ export default function Shopping({ route, navigation }) {
           <Appbar.Content titleStyle={styles.appbarTitle} title={store ? store.title : 'Shopping List'} />
         </Appbar.Header>
 
-        <FlatList
-          data={items}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <List.Item
-              title={item.title}
-              style={styles.listItem}
-              titleStyle={[styles.titleStyle, item.completed && styles.completedTitle]}
-              left={() => (
-                <EmojiCheckbox
-                  completed={item.completed}
-                  onPress={() => toggleComplete(item.id, item.completed)}
-                />
-              )}
-              right={() => (
-                <Text 
-                  style={styles.delete} 
-                  onPress={() => deleteItem(item.id)}
-                  accessible={true}
-                  accessibilityLabel={`Deletar item ${item.title}`}
-                >
-                  🗑️
-                </Text>
-              )}
-            />
-          )}
-          ListEmptyComponent={() => (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyMessage}>Sua lista está vazia. Adicione itens!</Text>
-            </View>
-          )}
-        />
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#03A9F4" />
+          </View>
+        ) : (
+          <FlatList
+            data={items}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <List.Item
+                title={item.title}
+                style={styles.listItem}
+                titleStyle={[styles.titleStyle, item.completed && styles.completedTitle]}
+                left={() => (
+                  <EmojiCheckbox
+                    completed={item.completed}
+                    onPress={() => toggleComplete(item.id, item.completed)}
+                  />
+                )}
+                right={() => (
+                  <Text 
+                    style={styles.delete} 
+                    onPress={() => deleteItem(item.id)}
+                    accessible={true}
+                    accessibilityLabel={`Deletar item ${item.title}`}
+                  >
+                    🗑️
+                  </Text>
+                )}
+              />
+            )}
+            ListEmptyComponent={() => (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyMessage}>Sua lista está vazia. Adicione itens!</Text>
+              </View>
+            )}
+          />
+        )}
 
         <TextInput
           mode='outlined'
@@ -199,7 +209,7 @@ const styles = StyleSheet.create({
   input: {
     width: '80%',
     borderRadius: 7,
-    padding: 9 ,
+    padding: 9,
     marginTop: 20,
     backgroundColor: '#3E4A59',
   },
@@ -226,5 +236,10 @@ const styles = StyleSheet.create({
     padding: 8,
     color: 'red',
     fontSize: 18,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

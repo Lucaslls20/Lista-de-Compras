@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Pressable, Alert } from 'react-native';
-import { TextInput, Button, Text } from 'react-native-paper';
+import { View, StyleSheet, Pressable, Alert} from 'react-native';
+import { TextInput, Button, Text} from 'react-native-paper';
 import { Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { auth } from '../../services/firebaseConfig';

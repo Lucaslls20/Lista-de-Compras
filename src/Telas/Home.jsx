@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, FlatList, StyleSheet, Dimensions, Alert } from 'react-native';
+import { View, FlatList, StyleSheet, Dimensions, Alert, ActivityIndicator } from 'react-native'; // Adicione ActivityIndicator
 import { List, Appbar, FAB, Button, Dialog, Portal, Text, PaperProvider, TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
-import { collection, addDoc, deleteDoc, doc, onSnapshot, getDocs, query, where } from "firebase/firestore"; // Import 'query' and 'where'
-import { db, auth } from '../../services/firebaseConfig'; // Import 'auth' 
+import { collection, addDoc, deleteDoc, doc, onSnapshot, getDocs, query, where } from "firebase/firestore";
+import { db, auth } from '../../services/firebaseConfig';
 import { writeBatch } from "firebase/firestore";
-
 
 const { width, height } = Dimensions.get('window');
 
@@ -13,22 +12,26 @@ const Home = () => {
   const navigation = useNavigation();
   const [data, setData] = useState([]);
   const [visible, setVisible] = useState(false);
+  const [loading, setLoading] = useState(true); // Novo estado para o ActivityIndicator
   const [newItemTitle, setNewItemTitle] = useState('');
 
   useEffect(() => {
     const user = auth.currentUser;
     if (user) {
       const storesRef = collection(db, 'stores');
-      const q = query(storesRef, where('userId', '==', user.uid)); // Filtra as lojas pelo UID do usuário
+      const q = query(storesRef, where('userId', '==', user.uid));
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const fetchedItems = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
         setData(fetchedItems);
+        setLoading(false); // Para o ActivityIndicator após o carregamento
       });
 
       return () => unsubscribe();
+    } else {
+      setLoading(false); // Se não houver usuário logado, para o ActivityIndicator
     }
   }, []);
 
@@ -43,7 +46,7 @@ const Home = () => {
           await addDoc(collection(db, 'stores'), {
             title: newItemTitle,
             completed: false,
-            userId: user.uid, // Salva o UID do usuário junto com os dados da loja
+            userId: user.uid,
           });
           setNewItemTitle('');
           hideDialog();
@@ -83,33 +86,39 @@ const Home = () => {
           <Appbar.Content title="Minhas Lojas" titleStyle={styles.appbarTitle} />
         </Appbar.Header>
 
-        <FlatList
-          data={data}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <List.Item
-              title={item.title}
-              style={styles.listItem}
-              titleStyle={styles.titleStyle}
-              onPress={() => navigation.navigate('Shopping', { store: item })}
-              right={() => (
-                <Text 
-                  style={styles.delete} 
-                  onPress={() => deleteStoreAndItems(item.id)}
-                  accessible={true}
-                  accessibilityLabel={`Deletar loja ${item.title}`}
-                >
-                  🗑️
-                </Text>
-              )}
-            />
-          )}
-          ListEmptyComponent={() => (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyMessage}>Nenhuma loja cadastrada. Adicione uma nova loja!</Text>
-            </View>
-          )}
-        />
+        {loading ? ( // Verifica se está carregando
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#03A9F4" />
+          </View>
+        ) : (
+          <FlatList
+            data={data}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <List.Item
+                title={item.title}
+                style={styles.listItem}
+                titleStyle={styles.titleStyle}
+                onPress={() => navigation.navigate('Shopping', { store: item })}
+                right={() => (
+                  <Text
+                    style={styles.delete}
+                    onPress={() => deleteStoreAndItems(item.id)}
+                    accessible={true}
+                    accessibilityLabel={`Deletar loja ${item.title}`}
+                  >
+                    🗑️
+                  </Text>
+                )}
+              />
+            )}
+            ListEmptyComponent={() => (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyMessage}>Nenhuma loja cadastrada. Adicione uma nova loja!</Text>
+              </View>
+            )}
+          />
+        )}
 
         <FAB
           style={styles.fab}
@@ -216,7 +225,11 @@ const styles = StyleSheet.create({
     color: 'red',
     fontSize: 18,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });
 
 export default Home;
-
