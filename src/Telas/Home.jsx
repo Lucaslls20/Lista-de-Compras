@@ -1,19 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { View, FlatList, StyleSheet, Dimensions, Alert, ActivityIndicator } from 'react-native'; // Adicione ActivityIndicator
-import { List, Appbar, FAB, Button, Dialog, Portal, Text, PaperProvider, TextInput } from 'react-native-paper';
+import { View, FlatList, StyleSheet, Dimensions, Alert, ActivityIndicator, Animated, Platform } from 'react-native';
+import { List, Appbar, FAB, Button, Dialog, Portal, Text, PaperProvider, TextInput, Snackbar } from 'react-native-paper';
+import DateTimePicker from '@react-native-community/datetimepicker'; // Importando o DatePicker
 import { useNavigation } from '@react-navigation/native';
 import { collection, addDoc, deleteDoc, doc, onSnapshot, getDocs, query, where } from "firebase/firestore";
 import { db, auth } from '../../services/firebaseConfig';
 import { writeBatch } from "firebase/firestore";
+import { Easing } from 'react-native-reanimated';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 const Home = () => {
   const navigation = useNavigation();
   const [data, setData] = useState([]);
   const [visible, setVisible] = useState(false);
-  const [loading, setLoading] = useState(true); // Novo estado para o ActivityIndicator
+  const [loading, setLoading] = useState(true);
   const [newItemTitle, setNewItemTitle] = useState('');
+  const [selectedDate, setSelectedDate] = useState(new Date()); // Estado para a data
+  const [showDatePicker, setShowDatePicker] = useState(false); // Estado para exibir o DatePicker
+  const [feedbackVisible, setFeedbackVisible] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+
+  const fadeAnim = useState(new Animated.Value(0))[0];
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -26,17 +34,21 @@ const Home = () => {
           ...doc.data()
         }));
         setData(fetchedItems);
-        setLoading(false); // Para o ActivityIndicator após o carregamento
+        setLoading(false);
       });
 
       return () => unsubscribe();
     } else {
-      setLoading(false); // Se não houver usuário logado, para o ActivityIndicator
+      setLoading(false);
     }
   }, []);
 
   const showDialog = () => setVisible(true);
-  const hideDialog = () => setVisible(false);
+  const hideDialog = () => {
+    setVisible(false);
+    setNewItemTitle('');
+    setSelectedDate(new Date());
+  };
 
   const addItem = async () => {
     if (newItemTitle.trim()) {
@@ -46,10 +58,12 @@ const Home = () => {
           await addDoc(collection(db, 'stores'), {
             title: newItemTitle,
             completed: false,
+            dateAdded: selectedDate.toISOString(), // Adicionando a data ao documento
             userId: user.uid,
           });
           setNewItemTitle('');
           hideDialog();
+          showFeedback('Loja adicionada com sucesso!');
         }
       } catch (error) {
         console.error('Erro ao adicionar loja:', error);
@@ -72,11 +86,38 @@ const Home = () => {
 
       batch.delete(storeRef);
       await batch.commit();
-
+      showFeedback('Loja removida com sucesso!');
     } catch (error) {
       console.error('Erro ao deletar loja e itens associados:', error);
       Alert.alert('Erro', 'Não foi possível deletar a loja e os itens. Tente novamente.');
     }
+  };
+
+  const showFeedback = (message) => {
+    setFeedbackMessage(message);
+    setFeedbackVisible(true);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 500,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleFeedbackDismiss = () => {
+    setFeedbackVisible(false);
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 500,
+      easing: Easing.in(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const onDateChange = (event, selectedDate) => {
+    const currentDate = selectedDate || new Date();
+    setShowDatePicker(Platform.OS === 'ios');
+    setSelectedDate(currentDate);
   };
 
   return (
@@ -86,7 +127,7 @@ const Home = () => {
           <Appbar.Content title="Minhas Lojas" titleStyle={styles.appbarTitle} />
         </Appbar.Header>
 
-        {loading ? ( // Verifica se está carregando
+        {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#03A9F4" />
           </View>
@@ -97,20 +138,20 @@ const Home = () => {
             renderItem={({ item }) => (
               <List.Item
                 title={item.title}
+                description={new Date(item.dateAdded).toLocaleDateString()} // Exibindo a data na descrição
                 style={styles.listItem}
                 titleStyle={styles.titleStyle}
-                onPress={() => navigation.navigate('Shopping', { store: item })}
+                onPress={() => navigation.navigate('Shopping', { store: item, dateAdded: item.dateAdded })} // Passando a data para a próxima tela
                 right={() => (
                   <Text
                     style={styles.delete}
                     onPress={() => deleteStoreAndItems(item.id)}
-                    accessible={true}
-                    accessibilityLabel={`Deletar loja ${item.title}`}
                   >
                     🗑️
                   </Text>
                 )}
               />
+
             )}
             ListEmptyComponent={() => (
               <View style={styles.emptyContainer}>
@@ -124,8 +165,6 @@ const Home = () => {
           style={styles.fab}
           icon={() => <Text style={styles.fabIcon}>+</Text>}
           onPress={showDialog}
-          accessible={true}
-          accessibilityLabel="Botão flutuante para adicionar uma nova loja"
         />
 
         <Portal>
@@ -137,15 +176,31 @@ const Home = () => {
                 value={newItemTitle}
                 onChangeText={setNewItemTitle}
                 style={styles.input}
-                accessibilityLabel="Campo para adicionar o nome de uma nova loja"
               />
+              <Button onPress={() => setShowDatePicker(true)}>Selecionar Data</Button>
+              {showDatePicker && (
+                <DateTimePicker
+                  value={selectedDate}
+                  mode="date"
+                  display='compact'
+                  onChange={onDateChange}
+                />
+              )}
             </Dialog.Content>
             <Dialog.Actions>
-              <Button onPress={hideDialog} accessibilityLabel="Cancelar adição de nova loja">Cancelar</Button>
-              <Button onPress={addItem} accessibilityLabel="Confirmar adição de nova loja">Adicionar</Button>
+              <Button onPress={hideDialog}>Cancelar</Button>
+              <Button onPress={addItem}>Adicionar</Button>
             </Dialog.Actions>
           </Dialog>
         </Portal>
+
+        <Snackbar
+          visible={feedbackVisible}
+          onDismiss={handleFeedbackDismiss}
+          duration={3000}
+        >
+          {feedbackMessage}
+        </Snackbar>
       </View>
     </PaperProvider>
   );
@@ -159,33 +214,24 @@ const styles = StyleSheet.create({
   },
   appbar: {
     backgroundColor: '#3E4A59',
-    borderWidth: 4,
-    borderRadius: 10,
-    paddingLeft: 20,
   },
   appbarTitle: {
     color: '#FFF',
-    fontStyle: 'italic',
     fontWeight: 'bold',
     fontSize: 25,
-    textShadowColor: 'rgba(0, 0, 0, 0.55)',
-    textShadowOffset: { width: -1, height: 1 },
-    textShadowRadius: 10,
   },
   listItem: {
-    width: '100%',
-    backgroundColor: '#F5F5DC',
-    marginVertical: 4,
-    marginTop: 20,
-    borderRadius: 20,
+    backgroundColor: '#FFF',
+    marginVertical: 10,
+    padding: 20,
+    borderRadius: 10,
+    marginTop: 24,
   },
   titleStyle: {
-    fontSize: 22,
-    color: '#37474F',
+    fontSize: 20,
     fontWeight: 'bold',
-    textShadowColor: 'rgba(0, 0, 0, 0.45)',
-    textShadowOffset: { width: -1, height: 1 },
-    textShadowRadius: 10,
+    color: '#656',
+    fontStyle: 'italic',
   },
   emptyContainer: {
     flex: 1,
@@ -194,12 +240,12 @@ const styles = StyleSheet.create({
     marginTop: 50,
   },
   emptyMessage: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#A41F1B',
   },
   input: {
     marginBottom: 10,
-    backgroundColor: '#555',
+    backgroundColor: '#666',
   },
   fab: {
     position: 'absolute',
@@ -207,21 +253,12 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: '#03A9F4',
-    width: width * 0.15,
-    height: width * 0.15,
-    borderRadius: width * 0.075,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 4,
   },
   fabIcon: {
-    fontSize: width * 0.08,
+    fontSize: 24,
     color: '#FFF',
-    textAlign: 'center',
-    lineHeight: width * 0.09,
   },
   delete: {
-    padding: 8,
     color: 'red',
     fontSize: 18,
   },

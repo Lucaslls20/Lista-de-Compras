@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { View, FlatList, StyleSheet, Text, Dimensions, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { Checkbox, TextInput, FAB, Appbar, List, PaperProvider } from 'react-native-paper';
+import { View, FlatList, StyleSheet, Text, Dimensions, TouchableOpacity, Alert, ActivityIndicator, Animated, Easing } from 'react-native';
+import { Checkbox, TextInput, FAB, Appbar, List, PaperProvider, Portal, Dialog } from 'react-native-paper';
 import { collection, addDoc, updateDoc, doc, deleteDoc, onSnapshot, query, where, getDoc } from "firebase/firestore";
 import { db, auth } from '../../services/firebaseConfig';
 
 const { width } = Dimensions.get('window');
 
 export default function Shopping({ route, navigation }) {
-  const { store } = route.params;
+  const { store, dateAdded } = route.params; // Recebendo a data
   const [items, setItems] = useState([]);
   const [newItem, setNewItem] = useState('');
   const [loading, setLoading] = useState(true);
+  const [visible, setVisible] = useState(false);
+  const fadeAnim = useState(new Animated.Value(0))[0];
 
   const EmojiCheckbox = ({ completed, onPress }) => (
     <TouchableOpacity style={{ marginLeft: 10 }} onPress={onPress} accessible={true} accessibilityLabel={completed ? "Desmarcar item" : "Marcar item como concluído"}>
@@ -55,6 +57,7 @@ export default function Shopping({ route, navigation }) {
             userId: user.uid,
           });
           setNewItem('');
+          hideDialog();
         }
       } catch (error) {
         console.error('Erro ao adicionar item de compra:', error);
@@ -89,6 +92,18 @@ export default function Shopping({ route, navigation }) {
     }
   };
 
+  const showDialog = () => setVisible(true);
+  const hideDialog = () => setVisible(false);
+
+  const animateFAB = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 500,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+  };
+
   return (
     <PaperProvider>
       <View style={styles.container}>
@@ -96,9 +111,11 @@ export default function Shopping({ route, navigation }) {
           <Appbar.Content titleStyle={styles.appbarTitle} title={store ? store.title : 'Shopping List'} />
         </Appbar.Header>
 
+         
+
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#03A9F4" />
+            <ActivityIndicator size="large" color="#FF6F61" />
           </View>
         ) : (
           <FlatList
@@ -106,7 +123,8 @@ export default function Shopping({ route, navigation }) {
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <List.Item
-                title={item.title}
+                title={<Text>{item.title}</Text>} // Envolver o título em um componente <Text>
+                description={<Text>{item.description || ''}</Text>} // Exibir uma descrição vazia, caso não tenha descrição
                 style={styles.listItem}
                 titleStyle={[styles.titleStyle, item.completed && styles.completedTitle]}
                 left={() => (
@@ -116,14 +134,13 @@ export default function Shopping({ route, navigation }) {
                   />
                 )}
                 right={() => (
-                  <Text 
-                    style={styles.delete} 
+                  <TouchableOpacity
                     onPress={() => deleteItem(item.id)}
                     accessible={true}
-                    accessibilityLabel={`Deletar item ${item.title}`}
-                  >
-                    🗑️
-                  </Text>
+                    accessibilityLabel={`Deletar item ${item.title}`}>
+                    <Text style={styles.delete}>🗑️</Text>
+                  </TouchableOpacity>
+
                 )}
               />
             )}
@@ -135,22 +152,39 @@ export default function Shopping({ route, navigation }) {
           />
         )}
 
-        <TextInput
-          mode='outlined'
-          label="Adicionar Item"
-          value={newItem}
-          onChangeText={text => setNewItem(text)}
-          style={styles.input}
-          accessibilityLabel="Campo para adicionar um novo item de compra"
-        />
-
         <FAB
           style={styles.fab}
           icon={() => <Text style={styles.fabIcon}>+</Text>}
-          onPress={addItem}
+          onPress={() => {
+            animateFAB();
+            showDialog();
+          }}
           accessible={true}
           accessibilityLabel="Botão flutuante para adicionar um novo item de compra"
         />
+
+        <Portal>
+          <Dialog visible={visible} onDismiss={hideDialog} style={styles.dialog}>
+            <Dialog.Title>Adicionar Item</Dialog.Title>
+            <Dialog.Content>
+              <TextInput
+                mode='outlined'
+                label="Nome do Item"
+                value={newItem}
+                onChangeText={text => setNewItem(text)}
+                style={styles.input}
+              />
+            </Dialog.Content>
+            <Dialog.Actions>
+              <TouchableOpacity onPress={hideDialog}>
+                <Text>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={addItem}>
+                <Text>Adicionar</Text>
+              </TouchableOpacity>
+            </Dialog.Actions>
+          </Dialog>
+        </Portal>
       </View>
     </PaperProvider>
   );
@@ -242,4 +276,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+
+  dateText: {
+    fontSize: 16,
+    color: '#37474F',
+    textAlign: 'center',
+    marginVertical: 10,
+  },
+
 });
