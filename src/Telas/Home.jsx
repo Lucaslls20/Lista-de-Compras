@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, FlatList, StyleSheet, Dimensions, Alert, ActivityIndicator, Animated, Platform } from 'react-native';
 import { List, Appbar, FAB, Button, Dialog, Portal, Text, PaperProvider, TextInput, Snackbar } from 'react-native-paper';
-import DateTimePicker from '@react-native-community/datetimepicker'; // Importando o DatePicker
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '@react-navigation/native';
 import { collection, addDoc, deleteDoc, doc, onSnapshot, getDocs, query, where } from "firebase/firestore";
 import { db, auth } from '../../services/firebaseConfig';
@@ -16,12 +16,11 @@ const Home = () => {
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [newItemTitle, setNewItemTitle] = useState('');
-  const [selectedDate, setSelectedDate] = useState(new Date()); // Estado para a data
-  const [showDatePicker, setShowDatePicker] = useState(false); // Estado para exibir o DatePicker
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [feedbackVisible, setFeedbackVisible] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState('');
-
-  const fadeAnim = useState(new Animated.Value(0))[0];
+  const [removingItem, setRemovingItem] = useState(null); // Para rastrear o item sendo removido
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -31,10 +30,23 @@ const Home = () => {
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const fetchedItems = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...doc.data(),
+          fadeAnim: new Animated.Value(0), // Animação individual para cada item
+          slideAnim: new Animated.Value(0), // Animação de remoção
         }));
         setData(fetchedItems);
         setLoading(false);
+
+        // Iniciar a animação para cada item quando os dados forem carregados
+        fetchedItems.forEach((item, index) => {
+          Animated.timing(item.fadeAnim, {
+            toValue: 1,
+            duration: 800,
+            delay: index * 100, // Delay para cada item
+            easing: Easing.ease,
+            useNativeDriver: true,
+          }).start();
+        });
       });
 
       return () => unsubscribe();
@@ -58,7 +70,7 @@ const Home = () => {
           await addDoc(collection(db, 'stores'), {
             title: newItemTitle,
             completed: false,
-            dateAdded: selectedDate.toISOString(), // Adicionando a data ao documento
+            dateAdded: selectedDate.toISOString(),
             userId: user.uid,
           });
           setNewItemTitle('');
@@ -72,46 +84,41 @@ const Home = () => {
     }
   };
 
-  const deleteStoreAndItems = async (id) => {
-    try {
-      const storeRef = doc(db, 'stores', id);
-      const itemsQuery = await getDocs(collection(db, 'shoppingItems'));
-      const batch = writeBatch(db);
+  const deleteStoreAndItems = (item) => {
+    Animated.timing(item.slideAnim, {
+      toValue: 1, // Deslizar para a direita
+      duration: 300,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start(async () => {
+      try {
+        const storeRef = doc(db, 'stores', item.id);
+        const itemsQuery = await getDocs(collection(db, 'shoppingItems'));
+        const batch = writeBatch(db);
 
-      itemsQuery.forEach((doc) => {
-        if (doc.data().storeId === id) {
-          batch.delete(doc.ref);
-        }
-      });
+        itemsQuery.forEach((doc) => {
+          if (doc.data().storeId === item.id) {
+            batch.delete(doc.ref);
+          }
+        });
 
-      batch.delete(storeRef);
-      await batch.commit();
-      showFeedback('Loja removida com sucesso!');
-    } catch (error) {
-      console.error('Erro ao deletar loja e itens associados:', error);
-      Alert.alert('Erro', 'Não foi possível deletar a loja e os itens. Tente novamente.');
-    }
+        batch.delete(storeRef);
+        await batch.commit();
+        showFeedback('Loja removida com sucesso!');
+      } catch (error) {
+        console.error('Erro ao deletar loja e itens associados:', error);
+        Alert.alert('Erro', 'Não foi possível deletar a loja e os itens. Tente novamente.');
+      }
+    });
   };
 
   const showFeedback = (message) => {
     setFeedbackMessage(message);
     setFeedbackVisible(true);
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 500,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: true,
-    }).start();
   };
 
   const handleFeedbackDismiss = () => {
     setFeedbackVisible(false);
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 500,
-      easing: Easing.in(Easing.ease),
-      useNativeDriver: true,
-    }).start();
   };
 
   const onDateChange = (event, selectedDate) => {
@@ -136,22 +143,38 @@ const Home = () => {
             data={data}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
-              <List.Item
-                title={item.title}
-                description={new Date(item.dateAdded).toLocaleDateString()} // Exibindo a data na descrição
-                style={styles.listItem}
-                titleStyle={styles.titleStyle}
-                onPress={() => navigation.navigate('Shopping', { store: item, dateAdded: item.dateAdded })} // Passando a data para a próxima tela
-                right={() => (
-                  <Text
-                    style={styles.delete}
-                    onPress={() => deleteStoreAndItems(item.id)}
-                  >
-                    🗑️
-                  </Text>
-                )}
-              />
-
+              <Animated.View
+                style={[
+                  styles.animatedItem,
+                  {
+                    opacity: item.fadeAnim,
+                    transform: [
+                      {
+                        translateX: item.slideAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, width], // Deslizar para fora da tela
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                <List.Item
+                  title={item.title}
+                  description={`${new Date(item.dateAdded).toLocaleDateString()} - ${item.address || 'Sem endereço'}`}
+                  style={styles.listItem}
+                  titleStyle={styles.titleStyle}
+                  onPress={() => navigation.navigate('Shopping', { store: item, dateAdded: item.dateAdded })}
+                  right={() => (
+                    <Text
+                      style={styles.delete}
+                      onPress={() => deleteStoreAndItems(item)}
+                    >
+                      🗑️
+                    </Text>
+                  )}
+                />
+              </Animated.View>
             )}
             ListEmptyComponent={() => (
               <View style={styles.emptyContainer}>
@@ -187,7 +210,7 @@ const Home = () => {
                 />
               )}
             </Dialog.Content>
-            <Dialog.Actions>
+            <Dialog.Actions style={{justifyContent:'space-between'}}>
               <Button onPress={hideDialog}>Cancelar</Button>
               <Button onPress={addItem}>Adicionar</Button>
             </Dialog.Actions>
@@ -210,7 +233,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#e2e2e2',
   },
   appbar: {
     backgroundColor: '#3E4A59',
@@ -227,6 +250,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginTop: 24,
   },
+  animatedItem: {
+    opacity: 0,
+  },
   titleStyle: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -240,12 +266,13 @@ const styles = StyleSheet.create({
     marginTop: 50,
   },
   emptyMessage: {
-    fontSize: 16,
-    color: '#A41F1B',
+    fontSize: 18,
+    color: '#999',
   },
-  input: {
-    marginBottom: 10,
-    backgroundColor: '#666',
+  delete: {
+    color: '#E74C3C',
+    fontSize: 22,
+    marginRight: 20,
   },
   fab: {
     position: 'absolute',
@@ -255,17 +282,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#03A9F4',
   },
   fabIcon: {
-    fontSize: 24,
+    fontSize: width * 0.08,
     color: '#FFF',
+    textAlign: 'center',
+    lineHeight: width * 0.09,
   },
-  delete: {
-    color: 'red',
-    fontSize: 18,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  input: {
+    marginBottom: 10,
   },
 });
 

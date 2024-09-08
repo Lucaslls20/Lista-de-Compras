@@ -1,22 +1,93 @@
-import React from 'react';
-import { View, StyleSheet, SafeAreaView, Image } from 'react-native';
+import React, { useRef, useEffect, useState } from 'react';
+import { View, StyleSheet, SafeAreaView, Image, Pressable, Animated } from 'react-native';
 import { Button, Text, Provider as PaperProvider } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 
 const Inicial = () => {
-
   const navigation = useNavigation();
+
+  // Função para animar tremor
+  const shakeAnimation = (animatedValue) => {
+    Animated.sequence([
+      Animated.timing(animatedValue, {
+        toValue: 1,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(animatedValue, {
+        toValue: -1,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(animatedValue, {
+        toValue: 1,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(animatedValue, {
+        toValue: 0,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  // Ref para os valores de animação dos botões
+  const buttonScale1 = useRef(new Animated.Value(1)).current;
+  const buttonScale2 = useRef(new Animated.Value(1)).current;
+
+  // Ref para os valores de animação dos ícones
+  const animatedValue1 = useRef(new Animated.Value(0)).current;
+  const animatedValue2 = useRef(new Animated.Value(0)).current;
+  const animatedValue3 = useRef(new Animated.Value(0)).current;
+
+  // Ref e animação da logo
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const pulse = () => {
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]).start(() => pulse()); // Loop da animação
+    };
+
+    pulse(); // Inicia a animação de pulso
+  }, [pulseAnim]);
+
+  const animateButton = (scaleAnim) => {
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 1.1,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
 
   return (
     <PaperProvider>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerText}>Bem-vindo ao App de Lista de Compras</Text>
+          <Text style={styles.headerText}>Bem-vindo ao ListaFácil</Text>
         </View>
 
         <View style={styles.logoContainer}>
-          <Image
-            style={styles.logo}
+          <Animated.Image
+            style={[styles.logo, { transform: [{ scale: pulseAnim }] }]} // Animação de pulso
             source={{ uri: 'https://i.pinimg.com/736x/3e/bf/39/3ebf39757e5a79e24940cbbb48fed06f.jpg' }}
           />
         </View>
@@ -26,42 +97,68 @@ const Inicial = () => {
         </View>
 
         <View style={styles.innerContainer}>
-          <Button
-            onPress={() => navigation.navigate('Login')}
-            mode='contained'
-            style={styles.buttonContained}
-          >
-            Login
-          </Button>
-          <Button
-            onPress={() => navigation.navigate('Registro')}
-            mode='contained'
-            style={styles.buttonOutlined}
-          >
-            Registro
-          </Button>
+          <Animated.View style={{ transform: [{ scale: buttonScale1 }], width:'100%', marginRight:5 }}>
+            <Button
+              onPress={() => {
+                animateButton(buttonScale1);
+                navigation.navigate('Login');
+              }}
+              mode='contained'
+              style={styles.buttonContained}
+            >
+              <Text style={{ fontSize: 18, color: '#FFF' }}>Login</Text>
+            </Button>
+          </Animated.View>
+          <Animated.View style={{ transform: [{ scale: buttonScale2 }], width:'100%', marginRight:5 }}>
+            <Button
+              onPress={() => {
+                animateButton(buttonScale2);
+                navigation.navigate('Registro');
+              }}
+              mode='contained'
+              style={styles.buttonOutlined}
+            >
+              <Text style={{ fontSize: 18, color: '#FFF' }}>Registro</Text>
+            </Button>
+          </Animated.View>
         </View>
 
         <View style={styles.iconContainer}>
-          <Image
-            style={styles.icon}
-            source={{ uri: 'https://catracalivre.com.br/cdn-cgi/image/f=auto,q=60,w=1200,h=1200,fit=cover,format=jpeg/wp-content/uploads/2020/03/mecado-livre-campanha-coronavirus-amarelo.png' }}
-          />
-          <Image
-            style={styles.icon}
-            source={{ uri: 'https://i0.wp.com/assets.b9.com.br/wp-content/uploads/2020/03/ifood.jpg?fit=1280%2C720&ssl=1' }}
-          />
-          <Image
-            style={styles.icon}
-            source={{ uri: 'https://w7.pngwing.com/pngs/221/535/png-transparent-amazon-dark-hd-logo-thumbnail.png' }}
-          />
+          <Pressable onPress={() => shakeAnimation(animatedValue1)}>
+            <Animated.Image
+              style={[styles.icon, { transform: [{ translateX: animatedValue1.interpolate({
+                inputRange: [-1, 1],
+                outputRange: [-5, 5],
+              }) }] }]}
+              source={{ uri: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSouW3_9DQVCVUjLKyHmqXbp8lghQyNiyTxIA&s' }}
+            />
+          </Pressable>
+
+          <Pressable onPress={() => shakeAnimation(animatedValue2)}>
+            <Animated.Image
+              style={[styles.icon, { transform: [{ translateX: animatedValue2.interpolate({
+                inputRange: [-1, 1],
+                outputRange: [-5, 5],
+              }) }] }]}
+              source={{ uri: 'https://st5.depositphotos.com/1001877/65791/i/1600/depositphotos_657912818-stock-photo-shopping-basket-fresh-food-grocery.jpg' }}
+            />
+          </Pressable>
+
+          <Pressable onPress={() => shakeAnimation(animatedValue3)}>
+            <Animated.Image
+              style={[styles.icon, { transform: [{ translateX: animatedValue3.interpolate({
+                inputRange: [-1, 1],
+                outputRange: [-5, 5],
+              }) }] }]}
+              source={{ uri: 'https://cdn-icons-png.flaticon.com/512/7835/7835565.png' }}
+            />
+          </Pressable>
         </View>
 
         <View style={styles.footerContainer}>
           <Text style={styles.footerText}>Versão 1.0</Text>
           <Text style={styles.footerTextBold}>Bem-vindo!</Text>
         </View>
-
       </SafeAreaView>
     </PaperProvider>
   );
@@ -70,7 +167,7 @@ const Inicial = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f4ff', // Cor de fundo mais suave
+    backgroundColor: '#D3D3D3',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -80,7 +177,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#ddd',
-    backgroundColor: '#e0e7ff', // Suave
+    backgroundColor: '#e0e7ff',
     marginBottom: 20,
     borderRadius: 15,
     marginTop: 40,
@@ -88,7 +185,7 @@ const styles = StyleSheet.create({
   headerText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#202453', // Contraste para legibilidade
+    color: '#202453',
   },
   logoContainer: {
     marginBottom: 20,
@@ -97,13 +194,8 @@ const styles = StyleSheet.create({
   },
   logo: {
     height: 125,
-    width: 250,
-    borderRadius: 30,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.8,
-    shadowRadius: 3,
-    elevation: 5,
+    borderRadius: 50,
+    width: 270,
   },
   descriptionContainer: {
     marginBottom: 20,
@@ -112,7 +204,7 @@ const styles = StyleSheet.create({
   descriptionText: {
     fontSize: 15,
     textAlign: 'center',
-    color: '#333', // Melhor contraste
+    color: '#333',
   },
   innerContainer: {
     width: '80%',
@@ -123,16 +215,16 @@ const styles = StyleSheet.create({
   buttonContained: {
     margin: 10,
     width: '100%',
-    backgroundColor: '#4b72ff', // Cor mais vibrante
+    backgroundColor: '#4b72ff',
   },
   buttonOutlined: {
     margin: 10,
     width: '100%',
-    backgroundColor: '#4b72ff', // Uniforme
+    backgroundColor: '#4b72ff',
   },
   iconContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between', // Balancear o layout dos ícones
+    justifyContent: 'space-between',
     marginTop: 20,
     width: '80%',
   },
@@ -140,6 +232,7 @@ const styles = StyleSheet.create({
     height: 50,
     width: 50,
     borderRadius: 8,
+    backgroundColor: 'transparent',
   },
   footerContainer: {
     marginTop: 40,
